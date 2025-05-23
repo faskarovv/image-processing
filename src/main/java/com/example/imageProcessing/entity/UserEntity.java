@@ -28,8 +28,8 @@ public class UserEntity implements UserDetails {
     @Id
     @NotNull
     @Column(name = "user_id")
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @NotBlank
     @Column(unique = true)
@@ -53,7 +53,7 @@ public class UserEntity implements UserDetails {
     @Column(name  = "verification_expiration")
     private LocalDateTime verificationTimeExpire;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.EAGER , cascade = {CascadeType.PERSIST , CascadeType.MERGE})
     @JoinTable(name = "user_roles" ,
               joinColumns = @JoinColumn(name = "user_id"),
               inverseJoinColumns = @JoinColumn(name = "role_id"))
