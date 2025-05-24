@@ -1,9 +1,7 @@
 package com.example.imageProcessing.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
 
 @Data
 @Builder
@@ -39,6 +37,20 @@ public class UserDto {
             private String email;
 
             private String verificationCode;
+        }
+
+       @Data
+        @Builder
+        @AllArgsConstructor
+        @NoArgsConstructor
+        public static class ResendRequest{
+            @NotNull
+            private String email;
+
+           @Override
+           public String toString() {
+               return "ResendRequest(email=" + this.email + ")";
+           }
         }
 
 }

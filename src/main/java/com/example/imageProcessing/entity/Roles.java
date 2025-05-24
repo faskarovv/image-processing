@@ -11,7 +11,7 @@ import java.util.*;
 public class Roles {
 
     @Id
-    @Column(name = "role_id")
+    @Column(name = "id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 

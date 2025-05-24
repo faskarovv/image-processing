@@ -6,10 +6,16 @@ import com.example.imageProcessing.dto.UserDto;
 import com.example.imageProcessing.entity.UserEntity;
 import com.example.imageProcessing.service.AuthService;
 import com.example.imageProcessing.service.JwtService;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.User;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
+
+@Slf4j
 @RestController
 @AllArgsConstructor
 @RequestMapping("/auth")
@@ -20,24 +26,14 @@ public class AuthController {
 
 
         @PostMapping("/signup")
-        public ResponseEntity<?> register(@RequestBody UserDto.Register register){
-            String password = register.getPassword();
-
-            if (password == null || password.isEmpty()) {
-                return ResponseEntity.badRequest().body("Password cannot be null or empty");
-            }
-
-            if (!password.matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$")) {
-                return ResponseEntity.badRequest().body("Password does not meet the required complexity");
-            }
-
+        public ResponseEntity<?> register(@Valid @RequestBody UserDto.Register register){
             UserEntity registeredUser = authService.signup(register);
 
             return ResponseEntity.ok(registeredUser);
         }
 
          @PostMapping("/login")
-         public ResponseEntity<LoginResponse> login(@RequestBody UserDto.Login login){
+         public ResponseEntity<LoginResponse> login(@Valid @RequestBody UserDto.Login login){
                 UserEntity authenticatedUser = authService.authenticate(login);
 
                 String jwtToken = jwtService.generateToken(authenticatedUser);
@@ -50,7 +46,7 @@ public class AuthController {
             }
 
             @PostMapping("/verify")
-            public ResponseEntity<?> verify(@RequestBody UserDto.Verify verify){
+            public ResponseEntity<?> verify(@Valid @RequestBody UserDto.Verify verify){
                 try{
                     authService.verify(verify);
                     return ResponseEntity.ok("Account verified successfuly");
@@ -60,9 +56,16 @@ public class AuthController {
             }
 
             @PostMapping("/resend")
-            public ResponseEntity<?> resendVerificationCode(@RequestBody String email){
+            public ResponseEntity<?> resendVerificationCode(@Valid @RequestBody UserDto.ResendRequest email){
+
+                System.out.println("DEBUG - Request object class: " + email.getClass().getName());
+                System.out.println("DEBUG - Request object fields: " + Arrays.toString(email.getClass().getDeclaredFields()));
+
+                log.info("Resend request received: {}", email); // Add this line
+                log.info("Email extracted: {}", email.getEmail());
+
                 try{
-                    authService.resend(email);
+                    authService.resend(email.getEmail());
                     return ResponseEntity.ok("Email have been resended");
                 } catch (RuntimeException e) {
                     return ResponseEntity.badRequest().body(e.getMessage());

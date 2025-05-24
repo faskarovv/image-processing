@@ -4,20 +4,27 @@ package com.example.imageProcessing.service;
 import com.example.imageProcessing.dto.UserDto;
 import com.example.imageProcessing.entity.Roles;
 import com.example.imageProcessing.entity.UserEntity;
+import com.example.imageProcessing.exceptionHandling.InvalidEntryException;
+import com.example.imageProcessing.exceptionHandling.UserNotFoundException;
 import com.example.imageProcessing.repo.RolesRepo;
 import com.example.imageProcessing.repo.UserRepo;
 import jakarta.mail.MessagingException;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.jmx.export.notification.UnableToSendNotificationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import javax.naming.AuthenticationException;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 
+@Slf4j
 @Service
 @AllArgsConstructor
 public class AuthService {
@@ -31,12 +38,17 @@ public class AuthService {
     public UserEntity signup(UserDto.Register register) {
         UserEntity user = new UserEntity();
         user.setUsername(register.getUsername());
-        user.setPassword(passwordEncoder.encode(register.getPassword()));
+
+        if(register.getPassword().matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$")) {
+            user.setPassword(passwordEncoder.encode(register.getPassword()));
+        }else {
+            throw new InvalidEntryException("password is invalid");
+        }
         user.setEmail(register.getEmail());
         user.setVerificationCode(generateVerificationCode());
         user.setVerificationTimeExpire(LocalDateTime.now().plusMinutes(20));
 
-        Roles userRole = (Roles) rolesRepo.findByName("ROLE_USER")
+        Roles userRole = (Roles) rolesRepo.findByName("user")
                 .orElseThrow(() -> new RuntimeException("Default role not found"));
 
         user.setRoles(Set.of(userRole));
@@ -48,18 +60,24 @@ public class AuthService {
 
 
     public UserEntity authenticate(UserDto.Login login) {
-        UserEntity user = userRepo.findByEmail(login.getEmail()).orElseThrow(()-> new RuntimeException("User not found"));
+        UserEntity user = userRepo.findByEmail(login.getEmail()).orElseThrow(()-> new UserNotFoundException("User does not exists"));
 
 
         if(!user.isEnabled()){
             throw new RuntimeException("account is not yet verified");
         }
-
+        if (!passwordEncoder.matches(login.getPassword(), user.getPassword())) {
+            throw new RuntimeException("Invalid credentials");
+        }
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(login.getEmail() , login.getPassword())
+                new UsernamePasswordAuthenticationToken(
+                        login.getEmail(),
+                        login.getPassword()
+                )
         );
 
-        return userRepo.findByEmail(login.getEmail()).orElseThrow();
+        return userRepo.findByEmail(login.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found after authentication"));
     }
 
 
@@ -88,12 +106,17 @@ public class AuthService {
     }
 
     public void resend(String email) {
-        Optional<UserEntity> userOptional = userRepo.findByEmail(email);
+        Objects.requireNonNull(email, "Email cannot be null");
+        email = email.trim();
+        if (email.isEmpty()) {
+            throw new IllegalArgumentException("Email cannot be empty");
+        }
+        try {
+            String finalEmail = email;
+            UserEntity user = userRepo.findByEmail(finalEmail)
+                    .orElseThrow(() -> new UserNotFoundException("User not found with email: " + finalEmail));
 
-        if(userOptional.isPresent()){
-            UserEntity user = userOptional.get();
-
-            if(user.isEnabled()){
+            if (user.isEnabled()) {
                 throw new RuntimeException("User already verified");
             }
             user.setVerificationCode(generateVerificationCode());
@@ -101,10 +124,11 @@ public class AuthService {
             sendVerificationEmail(user);
 
             userRepo.save(user);
+        } catch (Exception e) {
 
-        }else throw new RuntimeException("User is not found");
-
-    }
+            throw new RuntimeException("Could not complete resend request");
+        }
+        }
 
     public void sendVerificationEmail(UserEntity user){
         String subject = "Account verified";

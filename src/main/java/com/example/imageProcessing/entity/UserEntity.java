@@ -9,12 +9,14 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 @Data
@@ -53,10 +55,10 @@ public class UserEntity implements UserDetails {
     @Column(name  = "verification_expiration")
     private LocalDateTime verificationTimeExpire;
 
-    @ManyToMany(fetch = FetchType.EAGER , cascade = {CascadeType.PERSIST , CascadeType.MERGE})
+    @ManyToMany(fetch = FetchType.LAZY , cascade = {CascadeType.PERSIST , CascadeType.MERGE})
     @JoinTable(name = "user_roles" ,
               joinColumns = @JoinColumn(name = "user_id"),
-              inverseJoinColumns = @JoinColumn(name = "role_id"))
+              inverseJoinColumns = @JoinColumn(name = "id"))
     private Set<Roles> roles = new HashSet<>();
 
 
@@ -71,9 +73,9 @@ public class UserEntity implements UserDetails {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
 
-        return roles.stream()
-                .map(role->(GrantedAuthority) ()-> "ROLE_" + role.getName())
-                .toList();
+        return this.roles.stream()
+                .map(role -> new SimpleGrantedAuthority(role.getName()))
+                .collect(Collectors.toList());
     }
 
     @Override
